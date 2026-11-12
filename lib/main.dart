@@ -1,5 +1,8 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 // Integrante: Ryan Xavier P C Amaral
+
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 const String nome = 'Ryan Xavier P C Amaral';
 
@@ -35,7 +38,9 @@ class TelaReceitas extends StatefulWidget {
 class _TelaReceitasState extends State<TelaReceitas> {
   final TextEditingController _pesquisaController = TextEditingController();
 
-  void _buscarReceitas() {
+  List<Map<String, dynamic>> _receitas = [];
+
+  Future<void> _buscarReceitas() async {
     final termo = _pesquisaController.text.trim();
     if (termo.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -43,8 +48,48 @@ class _TelaReceitasState extends State<TelaReceitas> {
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('A pesquisa será implementada na próxima etapa.')),
+
+    final url = Uri.https(
+      'www.themealdb.com',
+      '/api/json/v1/1/search.php',
+      {'s': termo},
+    );
+    final resposta = await http.get(url);
+    final dados = jsonDecode(resposta.body) as Map<String, dynamic>;
+    final resultados = dados['meals'] as List<dynamic>? ?? [];
+    if (!mounted) return;
+    setState(() {
+      _receitas = resultados.cast<Map<String, dynamic>>();
+    });
+  }
+
+  Widget _mostrarResultados() {
+    if (_receitas.isEmpty) {
+      return const Center(child: Text('Nenhuma receita na lista.'));
+    }
+    return ListView.separated(
+      itemCount: _receitas.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final receita = _receitas[index];
+        final nome = receita['strMeal']?.toString() ?? 'Sem nome';
+        final imagem = receita['strMealThumb']?.toString() ?? '';
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(imagem, width: 88, height: 88, fit: BoxFit.cover),
+                ),
+                const SizedBox(width: 14),
+                Expanded(child: Text(nome, style: const TextStyle(fontSize: 17))),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -84,7 +129,7 @@ class _TelaReceitasState extends State<TelaReceitas> {
               TextField(
                 controller: _pesquisaController,
                 textInputAction: TextInputAction.search,
-                onSubmitted: (_) => _buscarReceitas(),
+                onSubmitted: (_) { _buscarReceitas(); },
                 decoration: const InputDecoration(
                   labelText: 'Nome da receita',
                   hintText: 'Ex.: chicken, pasta, beef...',
@@ -99,9 +144,7 @@ class _TelaReceitasState extends State<TelaReceitas> {
                 label: const Text('Pesquisar'),
               ),
               const SizedBox(height: 20),
-              const Expanded(
-                child: Center(child: Text('Digite o nome de uma receita para começar.')),
-              ),
+              Expanded(child: _mostrarResultados()),
             ],
           ),
         ),
@@ -109,4 +152,5 @@ class _TelaReceitasState extends State<TelaReceitas> {
     );
   }
 }
+
 
